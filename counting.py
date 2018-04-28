@@ -1,3 +1,11 @@
+'''
+    File name: counting.py
+    Author: skconan
+    Date created: 2018/03/06
+    Date last modified: 2018/03/08
+    Python Version: 3.6.1
+'''
+
 import cv2
 from lib import *
 
@@ -29,9 +37,9 @@ def warp_perspective(img, pts):
 def crop(img):
     global pts
     cv2.namedWindow('image')
+    cv2.setMouseCallback('image', get_position)
     while True:
         pts_redo = []
-        cv2.setMouseCallback('image', get_position)
         res_img = draw_circle(img.copy(), pts)
         cv2.imshow('image', res_img)
 
@@ -39,20 +47,24 @@ def crop(img):
 
         if k == ord('e'):
             exit(0)
+
         elif k == ord('z'):
             print('undo')
             if len(pts):
                 val = pts.pop()
                 pts_redo.append(val)
-            # print(pts)
+            
         elif k == ord('x'):
             print('redo')
             if len(pts_redo):
                 val = pts_redo.pop()
                 pts.append(val)
-            # print(pts)
+       
         elif k == ord('b'):
-            return warp_perspective(res_img, pts)
+            if len(pts) == 4:
+                return warp_perspective(res_img, pts)
+            else:
+                print('Please select only 4 corners in the picture(s).')
 
 
 def get_score(x):
@@ -85,13 +97,10 @@ def counting(img):
     before_cnt = erode.copy()
     score_text = ''
 
-
     _, contours, _ = cv2.findContours(
         before_cnt, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
-
     for cnt in contours:
-
         x, y, w, h = cv2.boundingRect(cnt)
         x += 2
         y += 2
@@ -101,30 +110,28 @@ def counting(img):
         cv2.rectangle(before_cnt, (x, y), (x + w, y + h), (255), 2)
     _, contours, _ = cv2.findContours(
         before_cnt, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+    
     for cnt in contours:
-
         x, y, w, h = cv2.boundingRect(cnt)
         x += 5
         y += 5
         w -= 10
         h -= 10
 
-
         area = w * h
         roi = th[y:y + h, x:x + w]
 
         if area >= 3000 or area <= 450:
-            # print(area)
             continue
+
         if h >= 70 or w >= 60 or w <= 30:
             continue
-        ct_one = np.count_nonzero(roi)
-        # print(ct_one)
-        # cv2.waitKey(-1)
-        cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 255), 1)
-        # res.append([x, y, w, h])
+
         if ct_one / (h * w * 1.0) >= 0.97:
             continue
+        
+        ct_one = np.count_nonzero(roi)
+        cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 255), 1)
         score = str(get_score(x))
         score_text += ', ' + score
         cv2.putText(img, score, (x + int(w / 2), y + int(h / 2)),
@@ -132,16 +139,17 @@ def counting(img):
 
     cv2.imshow('img', img)
     cv2.imshow('before', before_cnt)
-    cv2.imshow('th', th)
-    cv2.imshow('erode', erode)
+
     k = cv2.waitKey(-1) & 0xff
+
     return score_text
 
 
 def main():
-    f = open('counting.csv', 'w')
+    f = open('counting.csv', 'wr+')
     text = '\n'
     sub_sampling = 0.3
+    
     for i in range(1511, 1628):
         img_name = 'images\IMG_' + str(i) + '.JPG'
         print(img_name)
@@ -150,9 +158,7 @@ def main():
         res_crop = crop(img)
         res_text = counting(res_crop)
         text += img_name + res_text + '\n'
-        # print(res_text)
-
-    f.write(text)
+        f.write(text)
     f.close()
 
 
